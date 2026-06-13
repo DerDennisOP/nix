@@ -3077,7 +3077,7 @@ void EvalState::maybePrintStats()
     }
 }
 
-void EvalState::printStatistics()
+nlohmann::json EvalState::getStatisticsJSON()
 {
     std::chrono::microseconds cpuTimeDuration = getCpuUserTime();
     float cpuTime = std::chrono::duration_cast<std::chrono::duration<float>>(cpuTimeDuration).count();
@@ -3099,10 +3099,6 @@ void EvalState::printStatistics()
     auto gcCycles = getGCCycles();
 #endif
 
-    auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
-    std::fstream fs;
-    if (outPath != "-")
-        fs.open(outPath, std::fstream::out);
     json topObj = json::object();
     topObj["cpuTime"] = cpuTime;
     topObj["time"] = {
@@ -3206,9 +3202,20 @@ void EvalState::printStatistics()
         auto & list = topObj["symbols"];
         symbols.dump([&](std::string_view s) { list.emplace_back(s); });
     }
+
+    return topObj;
+}
+
+void EvalState::printStatistics()
+{
+    json topObj = getStatisticsJSON();
+
+    auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
     if (outPath == "-") {
         std::cerr << topObj.dump(2) << std::endl;
     } else {
+        std::fstream fs;
+        fs.open(outPath, std::fstream::out);
         fs << topObj.dump(2) << std::endl;
     }
 }
