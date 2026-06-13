@@ -42,10 +42,6 @@ TEST_F(nix_api_store_test, nix_api_eval_cache_walk)
 
     nix_setting_set(ctx, "experimental-features", "flakes");
     assert_ctx_ok();
-    nix_setting_set(ctx, "eval-cache", "true");
-    assert_ctx_ok();
-    nix_setting_set(ctx, "pure-eval", "true");
-    assert_ctx_ok();
 
     nix_libstore_init(ctx);
     assert_ctx_ok();
@@ -65,6 +61,11 @@ TEST_F(nix_api_store_test, nix_api_eval_cache_walk)
     assert_ctx_ok();
 
     nix_flake_settings_add_to_eval_state_builder(ctx, settings, builder);
+    assert_ctx_ok();
+
+    nix_eval_state_builder_set_setting(ctx, builder, "eval-cache", "true");
+    assert_ctx_ok();
+    nix_eval_state_builder_set_setting(ctx, builder, "pure-eval", "true");
     assert_ctx_ok();
 
     auto state = nix_eval_state_build(ctx, builder);
