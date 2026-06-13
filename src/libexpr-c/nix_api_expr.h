@@ -277,6 +277,21 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath, 
  */
 void nix_state_free(EvalState * state);
 
+/**
+ * @brief Get the evaluator statistics for a state as a JSON string.
+ *
+ * Returns the same data Nix writes to NIX_SHOW_STATS_PATH (cpuTime, nrThunks,
+ * nrAvoided, memory/GC counters, ...), serialized as JSON. Cheap; no GC first.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] state the evaluator state to read statistics from
+ * @param[in] callback Called with the JSON string
+ * @param[in] user_data optional, passed to the callback
+ * @return NIX_OK if there were no errors.
+ */
+nix_err nix_eval_state_get_stats_json(
+    nix_c_context * context, EvalState * state, nix_get_string_callback callback, void * user_data);
+
 /** @addtogroup GC
  * @ingroup libexpr
  * @brief Reference counting and garbage collector operations

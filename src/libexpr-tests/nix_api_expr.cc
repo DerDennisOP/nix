@@ -10,6 +10,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <nlohmann/json.hpp>
+
 #include "expr-tests-config.hh"
 
 namespace nixC {
@@ -663,6 +665,26 @@ TEST_F(nix_api_expr_test, nix_expr_thunk_re_evaluation_after_deployment)
     nix_get_string(ctx, thunk, OBSERVE_STRING(result));
     assert_ctx_ok();
     ASSERT_STREQ("vm-12345", result.c_str());
+}
+
+TEST_F(nix_api_expr_test, nix_eval_state_get_stats_json)
+{
+    auto value = nix_alloc_value(ctx, state);
+    nix_expr_eval_from_string(ctx, state, "let f = x: x + x; in f 21", ".", value);
+    assert_ctx_ok();
+    nix_value_force(ctx, state, value);
+    assert_ctx_ok();
+
+    std::string statsJson;
+    auto r = nix_eval_state_get_stats_json(ctx, state, OBSERVE_STRING(statsJson));
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, r);
+
+    auto j = nlohmann::json::parse(statsJson);
+    ASSERT_TRUE(j.contains("cpuTime"));
+    ASSERT_TRUE(j.contains("nrThunks"));
+    ASSERT_TRUE(j.contains("envs"));
+    ASSERT_TRUE(j["envs"].contains("bytes"));
 }
 
 } // namespace nixC
