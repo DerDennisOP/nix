@@ -977,4 +977,52 @@ TEST_F(nix_api_store_test, nix_derivation_clone)
     nix_derivation_free(drv2);
 }
 
+TEST_F(nix_api_store_test, nix_store_add_temp_and_perm_root)
+{
+    // Fixture store is a local filesystem store, so GC roots are supported.
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, path);
+
+    auto tmpRoot = nix::createTempDir();
+    nix::AutoDelete delTmp(tmpRoot, true);
+
+    auto rt = nix_store_add_temp_root(ctx, store, path);
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, rt);
+
+    std::string rootOut;
+    auto rp = nix_store_add_perm_root(ctx, store, path, (tmpRoot / "gcroot").string().c_str(), OBSERVE_STRING(rootOut));
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, rp);
+    ASSERT_FALSE(rootOut.empty());
+
+    nix_store_path_free(path);
+}
+
+TEST_F(nix_api_util_context, nix_store_add_perm_root_non_local_errors)
+{
+    Store * store = nix_store_open(ctx, "dummy://", nullptr);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, store);
+
+    std::string storeDir;
+    nix_store_get_storedir(ctx, store, OBSERVE_STRING(storeDir));
+    assert_ctx_ok();
+
+    StorePath * path = nix_store_parse_path(ctx, store, (storeDir + PATH_SUFFIX).c_str());
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, path);
+
+    std::string rootOut;
+    auto r = nix_store_add_perm_root(ctx, store, path, "/tmp/nix-bindings-nonlocal-gcroot", OBSERVE_STRING(rootOut));
+    ASSERT_EQ(NIX_ERR_NIX_ERROR, r);
+    const char * errMsg = nix_err_msg(nullptr, ctx, nullptr);
+    ASSERT_NE(nullptr, errMsg);
+    ASSERT_NE(std::string(errMsg).find("not a local filesystem store"), std::string::npos);
+
+    nix_store_path_free(path);
+    nix_store_free(store);
+}
+
 } // namespace nixC
