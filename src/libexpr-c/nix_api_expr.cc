@@ -2,6 +2,8 @@
 #include <stdexcept>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-gc.hh"
 #include "nix/store/globals.hh"
@@ -99,6 +101,18 @@ nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_val
         context->last_err_code = NIX_OK;
     try {
         state->state.forceValueDeep(*value->value);
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_eval_state_get_stats_json(
+    nix_c_context * context, EvalState * state, nix_get_string_callback callback, void * user_data)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto j = state->state.getStatisticsJSON();
+        return call_nix_get_string_callback(j.dump(), callback, user_data);
     }
     NIXC_CATCH_ERRS
 }

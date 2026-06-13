@@ -24,6 +24,8 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
 
+#include <nlohmann/json_fwd.hpp>
+
 #include <map>
 #include <optional>
 #include <functional>
@@ -1034,6 +1036,12 @@ public:
      * GC statistics are more accurate.
      */
     void maybePrintStats();
+
+    /**
+     * Build the evaluator-statistics JSON object (the same content printStatistics()
+     * writes), without performing any I/O. Cheap; does not run a GC first.
+     */
+    nlohmann::json getStatisticsJSON();
 
     /**
      * Print statistics, unconditionally, cheaply, without performing a GC first.
