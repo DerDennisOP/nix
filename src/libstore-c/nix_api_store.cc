@@ -100,6 +100,40 @@ nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_cal
     NIXC_CATCH_ERRS
 }
 
+nix_err nix_store_add_temp_root(nix_c_context * context, Store * store, const StorePath * path)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        store->ptr->addTempRoot(path->path);
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_store_add_perm_root(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * path,
+    const char * gcRoot,
+    nix_get_string_callback callback,
+    void * user_data)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (!gcRoot)
+            throw nix::UsageError("gcRoot must not be null");
+
+        auto localStore = store->ptr.dynamic_pointer_cast<nix::LocalFSStore>();
+        if (!localStore)
+            throw nix::UsageError("store does not support permanent GC roots (not a local filesystem store)");
+
+        auto resultPath = localStore->addPermRoot(path->path, std::filesystem::path(gcRoot));
+        return call_nix_get_string_callback(resultPath.string(), callback, user_data);
+    }
+    NIXC_CATCH_ERRS
+}
+
 bool nix_store_is_valid_path(nix_c_context * context, Store * store, const StorePath * path)
 {
     if (context)
