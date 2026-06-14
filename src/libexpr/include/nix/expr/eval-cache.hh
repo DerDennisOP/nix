@@ -50,6 +50,15 @@ public:
     EvalCache(std::optional<std::reference_wrapper<const Hash>> useCache, EvalState & state, RootLoader rootLoader);
 
     ref<AttrCursor> getRoot();
+
+    /**
+     * Commit pending eval-cache writes and checkpoint the WAL into the main
+     * database file, so a concurrent reader of the `.sqlite` (without its
+     * `-wal` sidecar) sees them. Normally the cache is only committed when the
+     * last `AttrDb` connection closes; long-lived evaluators that keep the
+     * cache open need this to persist incrementally. No-op without a cache.
+     */
+    void commit();
 };
 
 enum AttrType {
