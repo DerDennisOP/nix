@@ -37,6 +37,15 @@ nix_attr_cursor * nix_eval_cache_get_root(nix_c_context * context, nix_eval_cach
     NIXC_CATCH_ERRS_NULL
 }
 
+nix_err nix_eval_cache_commit(nix_c_context * context, nix_eval_cache * cache)
+{
+    nix_clear_err(context);
+    try {
+        cache->cache->commit();
+    }
+    NIXC_CATCH_ERRS
+}
+
 nix_attr_cursor * nix_attr_cursor_maybe_get_attr(nix_c_context * context, nix_attr_cursor * cursor, const char * name)
 {
     nix_clear_err(context);

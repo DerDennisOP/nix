@@ -57,6 +57,19 @@ void nix_eval_cache_free(nix_eval_cache * cache);
 nix_attr_cursor * nix_eval_cache_get_root(nix_c_context * context, nix_eval_cache * cache);
 
 /**
+ * @brief Commit pending writes and checkpoint the cache's SQLite WAL into the
+ * main `.sqlite` file.
+ *
+ * Persists eval-cache entries written so far so a reader of the database file
+ * (without its `-wal` sidecar) sees them, without closing the cache. Intended
+ * for long-lived evaluators that keep the cache open across many evaluations.
+ * @param[out] context Optional, stores error information
+ * @param[in] cache The evaluation cache
+ * @return NIX_OK on success.
+ */
+nix_err nix_eval_cache_commit(nix_c_context * context, nix_eval_cache * cache);
+
+/**
  * @brief Descend into a child attribute by name.
  * @param[out] context Optional, stores error information
  * @param[in] cursor The parent cursor
