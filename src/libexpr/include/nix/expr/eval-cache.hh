@@ -62,11 +62,13 @@ public:
     void commit();
 
     /**
-     * Fold the WAL into the main `.sqlite` file via a truncate checkpoint, so a
-     * reader of the database file (without its `-wal` sidecar) sees every
-     * committed write. Call this once with no concurrent readers/writers (e.g.
-     * at the end of an evaluation, before shipping the file); calling it while
-     * other connections hold WAL read locks will block. No-op without a cache.
+     * Fold the WAL into the main `.sqlite` file via a PASSIVE checkpoint, so a
+     * reader of the database file (without its `-wal` sidecar) sees the committed
+     * writes. Never blocks: it does not take the exclusive WAL read-slot lock, so
+     * it is safe to call while other connections (e.g. a concurrent evaluator of
+     * the same flake) hold read locks. A lone caller folds the whole WAL; under
+     * concurrency it folds what it can and the rest waits for a later call.
+     * No-op without a cache.
      */
     void checkpoint();
 };
