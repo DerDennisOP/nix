@@ -71,12 +71,13 @@ nix_attr_cursor * nix_eval_cache_get_root(nix_c_context * context, nix_eval_cach
 nix_err nix_eval_cache_commit(nix_c_context * context, nix_eval_cache * cache);
 
 /**
- * @brief Fold the cache's WAL into the main `.sqlite` file (truncate checkpoint).
+ * @brief Fold the cache's WAL into the main `.sqlite` file (PASSIVE checkpoint).
  *
- * Makes every committed write visible to a reader of the database file alone
- * (without its `-wal` sidecar). Call once with no concurrent readers/writers
- * (e.g. at end of evaluation before shipping the file); it blocks while other
- * connections hold WAL read locks.
+ * Makes committed writes visible to a reader of the database file alone (without
+ * its `-wal` sidecar). Never blocks: it does not take the exclusive WAL read-slot
+ * lock, so it is safe to call while other connections hold read locks (e.g. a
+ * concurrent evaluator of the same flake). A lone caller folds the whole WAL;
+ * under concurrency it folds what it can.
  * @param[out] context Optional, stores error information
  * @param[in] cache The evaluation cache
  * @return NIX_OK on success.

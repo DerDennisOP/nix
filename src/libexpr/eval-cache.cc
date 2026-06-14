@@ -403,7 +403,12 @@ void EvalCache::checkpoint()
         state->txn.reset();
     }
     try {
-        state->db.exec("pragma wal_checkpoint(truncate);");
+        // PASSIVE, not TRUNCATE: fold as many WAL frames into the main file as
+        // possible without taking the exclusive read-slot lock, so this never
+        // blocks (and never deadlocks) when another evaluator of the same flake
+        // is concurrently reading the cache. A lone evaluator still folds the
+        // whole WAL; under concurrency the rest is folded by a later checkpoint.
+        state->db.exec("pragma wal_checkpoint(passive);");
     } catch (...) {
         ignoreExceptionExceptInterrupt();
     }
