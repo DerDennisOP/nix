@@ -52,13 +52,23 @@ public:
     ref<AttrCursor> getRoot();
 
     /**
-     * Commit pending eval-cache writes and checkpoint the WAL into the main
-     * database file, so a concurrent reader of the `.sqlite` (without its
-     * `-wal` sidecar) sees them. Normally the cache is only committed when the
-     * last `AttrDb` connection closes; long-lived evaluators that keep the
-     * cache open need this to persist incrementally. No-op without a cache.
+     * Commit pending eval-cache writes by committing the SQLite transaction
+     * (appending to the WAL). Does NOT checkpoint, so it is safe to call from
+     * several evaluators writing the same cache concurrently — a truncate
+     * checkpoint would deadlock on the WAL read-slot locks. The writes are
+     * durable in the WAL; use checkpoint() to fold them into the main file.
+     * No-op without a cache.
      */
     void commit();
+
+    /**
+     * Fold the WAL into the main `.sqlite` file via a truncate checkpoint, so a
+     * reader of the database file (without its `-wal` sidecar) sees every
+     * committed write. Call this once with no concurrent readers/writers (e.g.
+     * at the end of an evaluation, before shipping the file); calling it while
+     * other connections hold WAL read locks will block. No-op without a cache.
+     */
+    void checkpoint();
 };
 
 enum AttrType {
