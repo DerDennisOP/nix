@@ -380,8 +380,28 @@ void EvalCache::commit()
     auto state(db->_state->lock());
     if (db->failed || !state->txn || !state->txn->active)
         return;
+    // Commit the transaction (appending to the WAL) but do NOT checkpoint:
+    // a truncate checkpoint takes an exclusive lock on the WAL read slots and
+    // deadlocks when several evaluators write the same cache concurrently. The
+    // WAL is durable across processes, so a later commit/reader still sees these
+    // writes; call checkpoint() once (with no concurrent readers) to fold the
+    // WAL back into the main file.
     state->txn->commit();
     state->txn.reset();
+    state->txn = std::make_unique<SQLiteTxn>(state->db);
+}
+
+void EvalCache::checkpoint()
+{
+    if (!db)
+        return;
+    auto state(db->_state->lock());
+    if (db->failed)
+        return;
+    if (state->txn && state->txn->active) {
+        state->txn->commit();
+        state->txn.reset();
+    }
     try {
         state->db.exec("pragma wal_checkpoint(truncate);");
     } catch (...) {

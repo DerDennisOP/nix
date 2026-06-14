@@ -46,6 +46,15 @@ nix_err nix_eval_cache_commit(nix_c_context * context, nix_eval_cache * cache)
     NIXC_CATCH_ERRS
 }
 
+nix_err nix_eval_cache_checkpoint(nix_c_context * context, nix_eval_cache * cache)
+{
+    nix_clear_err(context);
+    try {
+        cache->cache->checkpoint();
+    }
+    NIXC_CATCH_ERRS
+}
+
 nix_attr_cursor * nix_attr_cursor_maybe_get_attr(nix_c_context * context, nix_attr_cursor * cursor, const char * name)
 {
     nix_clear_err(context);
