@@ -373,6 +373,23 @@ ref<AttrCursor> EvalCache::getRoot()
     return make_ref<AttrCursor>(ref(shared_from_this()), std::nullopt);
 }
 
+void EvalCache::commit()
+{
+    if (!db)
+        return;
+    auto state(db->_state->lock());
+    if (db->failed || !state->txn || !state->txn->active)
+        return;
+    state->txn->commit();
+    state->txn.reset();
+    try {
+        state->db.exec("pragma wal_checkpoint(truncate);");
+    } catch (...) {
+        ignoreExceptionExceptInterrupt();
+    }
+    state->txn = std::make_unique<SQLiteTxn>(state->db);
+}
+
 AttrCursor::AttrCursor(
     ref<EvalCache> root, Parent parent, Value * value, std::optional<std::pair<AttrId, AttrValue>> && cachedValue)
     : root(root)
