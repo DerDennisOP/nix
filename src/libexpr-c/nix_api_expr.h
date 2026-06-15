@@ -16,6 +16,7 @@
 #include "nix_api_store.h"
 #include "nix_api_util.h"
 #include <stddef.h>
+#include <stdint.h>
 
 #ifndef __has_c_attribute
 #  define __has_c_attribute(x) 0
@@ -308,6 +309,37 @@ void nix_state_free(EvalState * state);
  */
 nix_err nix_eval_state_get_stats_json(
     nix_c_context * context, EvalState * state, nix_get_string_callback callback, void * user_data);
+
+/**
+ * @brief Flat snapshot of the cheap cumulative evaluator counters.
+ *
+ * All fields are monotonic over an EvalState's lifetime (gc_heap_size is a
+ * gauge); callers diff two snapshots to get per-evaluation cost without paying
+ * for JSON serialization on the hot path. GC fields are 0 when Boehm GC is off.
+ */
+typedef struct nix_eval_stats
+{
+    uint64_t nr_thunks;
+    uint64_t nr_function_calls;
+    uint64_t nr_primop_calls;
+    uint64_t nr_lookups;
+    uint64_t nr_op_updates;
+    uint64_t gc_heap_size;
+    uint64_t gc_total_bytes;
+} nix_eval_stats;
+
+/**
+ * @brief Read the lean evaluator statistics into a flat struct.
+ *
+ * Cheaper counterpart of ::nix_eval_state_get_stats_json with no JSON or
+ * allocation; intended to be polled per request to compute deltas.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] state the evaluator state to read statistics from
+ * @param[out] out filled with the current counter snapshot
+ * @return NIX_OK if there were no errors.
+ */
+nix_err nix_eval_state_get_stats(nix_c_context * context, EvalState * state, nix_eval_stats * out);
 
 /** @addtogroup GC
  * @ingroup libexpr
