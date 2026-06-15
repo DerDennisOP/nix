@@ -3206,6 +3206,23 @@ nlohmann::json EvalState::getStatisticsJSON()
     return topObj;
 }
 
+EvalState::LeanStats EvalState::getLeanStats()
+{
+    LeanStats s{};
+    s.nrThunks = nrThunks.load();
+    s.nrFunctionCalls = nrFunctionCalls.load();
+    s.nrPrimOpCalls = nrPrimOpCalls.load();
+    s.nrLookups = nrLookups.load();
+    s.nrOpUpdates = nrOpUpdates.load();
+#if NIX_USE_BOEHMGC
+    GC_word heapSize = 0, totalBytes = 0;
+    GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
+    s.gcHeapSize = (uint64_t) heapSize;
+    s.gcTotalBytes = (uint64_t) totalBytes;
+#endif
+    return s;
+}
+
 void EvalState::printStatistics()
 {
     json topObj = getStatisticsJSON();

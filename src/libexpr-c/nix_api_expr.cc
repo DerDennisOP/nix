@@ -122,19 +122,15 @@ nix_err nix_eval_state_get_stats(nix_c_context * context, EvalState * state, nix
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & s = state->state;
+        auto s = state->state.getLeanStats();
         *out = nix_eval_stats{};
-        out->nr_thunks = s.nrThunks.load();
-        out->nr_function_calls = s.nrFunctionCalls.load();
-        out->nr_primop_calls = s.nrPrimOpCalls.load();
-        out->nr_lookups = s.nrLookups.load();
-        out->nr_op_updates = s.nrOpUpdates.load();
-#if NIX_USE_BOEHMGC
-        GC_word heapSize = 0, totalBytes = 0;
-        GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
-        out->gc_heap_size = (uint64_t) heapSize;
-        out->gc_total_bytes = (uint64_t) totalBytes;
-#endif
+        out->nr_thunks = s.nrThunks;
+        out->nr_function_calls = s.nrFunctionCalls;
+        out->nr_primop_calls = s.nrPrimOpCalls;
+        out->nr_lookups = s.nrLookups;
+        out->nr_op_updates = s.nrOpUpdates;
+        out->gc_heap_size = s.gcHeapSize;
+        out->gc_total_bytes = s.gcTotalBytes;
         return NIX_OK;
     }
     NIXC_CATCH_ERRS
