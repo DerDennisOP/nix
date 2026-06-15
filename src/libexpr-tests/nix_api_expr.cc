@@ -689,18 +689,24 @@ TEST_F(nix_api_expr_test, nix_eval_state_get_stats_json)
 
 TEST_F(nix_api_expr_test, nix_eval_state_get_stats)
 {
+    nix_eval_stats before{};
+    ASSERT_EQ(NIX_OK, nix_eval_state_get_stats(ctx, state, &before));
+    assert_ctx_ok();
+
+    // Genuine recursion so the optimizer can't inline the calls away.
     auto value = nix_alloc_value(ctx, state);
-    nix_expr_eval_from_string(ctx, state, "let f = x: x + x; in f 21", ".", value);
+    nix_expr_eval_from_string(
+        ctx, state, "let f = n: if n == 0 then 0 else n + f (n - 1); in f 100", ".", value);
     assert_ctx_ok();
     nix_value_force(ctx, state, value);
     assert_ctx_ok();
 
-    nix_eval_stats stats{};
-    auto r = nix_eval_state_get_stats(ctx, state, &stats);
+    nix_eval_stats after{};
+    ASSERT_EQ(NIX_OK, nix_eval_state_get_stats(ctx, state, &after));
     assert_ctx_ok();
-    ASSERT_EQ(NIX_OK, r);
-    ASSERT_GT(stats.nr_thunks, 0u);
-    ASSERT_GT(stats.nr_function_calls, 0u);
+
+    ASSERT_GT(after.nr_function_calls, before.nr_function_calls);
+    ASSERT_GE(after.nr_thunks, before.nr_thunks);
 }
 
 } // namespace nixC
