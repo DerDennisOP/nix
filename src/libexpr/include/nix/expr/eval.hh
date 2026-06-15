@@ -1048,6 +1048,19 @@ public:
     nlohmann::json getStatisticsJSON();
 
     /**
+     * Lean snapshot of the cheap cumulative evaluator counters, backing the
+     * C API's nix_eval_state_get_stats. Unlike getStatisticsJSON() it reads
+     * the private counters (and the file-static nrThunks) without building any
+     * JSON, so it is cheap enough to poll per request.
+     */
+    struct LeanStats
+    {
+        uint64_t nrThunks, nrFunctionCalls, nrPrimOpCalls, nrLookups, nrOpUpdates;
+        uint64_t gcHeapSize, gcTotalBytes;
+    };
+    LeanStats getLeanStats();
+
+    /**
      * Print statistics, unconditionally, cheaply, without performing a GC first.
      */
     void printStatistics();
