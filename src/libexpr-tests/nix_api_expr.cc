@@ -742,4 +742,20 @@ TEST_F(nix_api_expr_test, nix_eval_state_get_stats_json)
     ASSERT_TRUE(j["envs"].contains("bytes"));
 }
 
+TEST_F(nix_api_expr_test, nix_eval_state_get_stats)
+{
+    auto value = nix_alloc_value(ctx, state);
+    nix_expr_eval_from_string(ctx, state, "let f = x: x + x; in f 21", ".", value);
+    assert_ctx_ok();
+    nix_value_force(ctx, state, value);
+    assert_ctx_ok();
+
+    nix_eval_stats stats{};
+    auto r = nix_eval_state_get_stats(ctx, state, &stats);
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, r);
+    ASSERT_GT(stats.nr_thunks, 0u);
+    ASSERT_GT(stats.nr_function_calls, 0u);
+}
+
 } // namespace nixC
