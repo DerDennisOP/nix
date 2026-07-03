@@ -193,7 +193,8 @@ TEST_F(nix_api_store_test, nix_api_locked_flake_get_fingerprint)
     assert_ctx_ok();
 
     auto parseFlags = nix_flake_reference_parse_flags_new(ctx, settings);
-    nix_flake_reference_parse_flags_set_base_directory(ctx, parseFlags, tmpDir.string().c_str(), tmpDir.string().size());
+    nix_flake_reference_parse_flags_set_base_directory(
+        ctx, parseFlags, tmpDir.string().c_str(), tmpDir.string().size());
     std::string fragment;
     nix_flake_reference * flakeRef = nullptr;
     nix_flake_reference_and_fragment_from_string(

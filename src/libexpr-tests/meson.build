@@ -49,8 +49,8 @@ subdir('nix-meson-build-support/common')
 sources = files(
   'derived-path.cc',
   'error_traces.cc',
-  'eval.cc',
   'eval-cache.cc',
+  'eval.cc',
   'json.cc',
   'lazy-fetcher-attr.cc',
   'main.cc',

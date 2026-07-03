@@ -1128,6 +1128,7 @@ public:
         uint64_t nrThunks, nrFunctionCalls, nrPrimOpCalls, nrLookups, nrOpUpdates;
         uint64_t gcHeapSize, gcTotalBytes;
     };
+
     LeanStats getLeanStats();
 
     /**
