@@ -244,8 +244,7 @@ TEST_F(EvalCacheTest, writeDerivationSeedsRootedPathMemo)
     counting->reset();
     auto drvPath = cache->getRoot()->forceDerivation();
     EXPECT_TRUE(drvPath.isDerivation());
-    EXPECT_EQ(counting->tempRoots.size(), 1)
-        << "writeDerivation roots the path; forceDerivation must reuse that root";
+    EXPECT_EQ(counting->tempRoots.size(), 1) << "writeDerivation roots the path; forceDerivation must reuse that root";
     EXPECT_EQ(counting->validityChecks.size() + counting->validityBatches.size(), 1);
 }
 
