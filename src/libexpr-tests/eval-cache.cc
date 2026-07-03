@@ -107,12 +107,12 @@ struct CountingStore : DummyStore
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
     {
-        unsupported("getFSAccessor");
+        return makeEmptySourceAccessor();
     }
 
     std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath) override
     {
-        unsupported("getFSAccessor");
+        return nullptr;
     }
 };
 
