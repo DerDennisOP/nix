@@ -1920,6 +1920,11 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         settings.readOnlyMode ? computeStorePath(*state.store, drv) : state.store->writeDerivation(drv, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
+    /* writeDerivation just rooted and registered the path, so validity
+       checks against it (e.g. AttrCursor::forceDerivation) can be elided. */
+    if (!settings.readOnlyMode)
+        state.rootedValidPaths.insert(drvPath);
+
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 
     /* Optimisation, but required in read-only mode! because in that

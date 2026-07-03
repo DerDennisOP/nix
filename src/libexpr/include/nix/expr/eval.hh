@@ -23,6 +23,7 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
+#include <boost/unordered/concurrent_flat_set.hpp>
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -497,6 +498,14 @@ public:
      * A cache for evaluation caches, so as to reuse the same root value if possible
      */
     std::map<const Hash, ref<eval_cache::EvalCache>> evalCaches;
+
+    /**
+     * Store paths for which a temporary GC root has been added on `store`
+     * and that were valid at that moment. Since the temporary root pins
+     * such a path for the lifetime of the store handle, re-rooting and
+     * re-validating it would be a redundant store round-trip.
+     */
+    boost::concurrent_flat_set<StorePath> rootedValidPaths;
 
 private:
 
