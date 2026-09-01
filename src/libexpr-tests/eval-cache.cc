@@ -95,9 +95,9 @@ struct CountingStore : DummyStore
         unsupported("addToStoreFromDump");
     }
 
-    void registerDrvOutput(const Realisation & output) override
+    void registerDrvOutputUnchecked(const Realisation & output) override
     {
-        unsupported("registerDrvOutput");
+        unsupported("registerDrvOutputUnchecked");
     }
 
     std::optional<TrustedFlag> isTrustedClient() override
