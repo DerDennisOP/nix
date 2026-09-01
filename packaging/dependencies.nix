@@ -98,7 +98,9 @@ scope: {
         "--with-iostreams"
         "--with-url"
       ];
-      patches = [
+      # Nixpkgs backports boostorg/context#337 itself from 1.88 on, and applying
+      # ours first makes its own context backports stop applying.
+      patches = lib.optionals (lib.versionOlder pkgs.boost.version "1.88") [
         ./patches/0001-Fix-uncaught_exceptions-not-accounting-for-forced_un.patch
       ];
       enableIcu = false;
