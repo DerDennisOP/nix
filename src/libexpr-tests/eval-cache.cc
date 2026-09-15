@@ -208,6 +208,41 @@ TEST_F(EvalCacheTest, invalidContextPathStillForcesRegeneration)
     EXPECT_TRUE(rechecked) << "a path that failed validation must not be memoized as valid";
 }
 
+/// Listing an attrset rewrites its row, and that row is the parent link of every
+/// value cached beneath it. Rewriting it destructively orphans the whole subtree,
+/// so a walk that discovers attributes by listing them re-derives the flake on
+/// every evaluation no matter how warm its blob is.
+TEST_F(EvalCacheTest, listingAnAttrsetKeepsTheValuesCachedBeneathIt)
+{
+    auto fp = hashString(HashAlgorithm::SHA256, "eval-cache-test-listing");
+    Value vRoot = eval(R"({ a = { b = "leaf"; c = "other"; }; })");
+
+    size_t loaderRuns = 0;
+    auto makeCountingCache = [&]() {
+        return make_ref<EvalCache>(std::cref(fp), state, [&]() {
+            loaderRuns++;
+            return &vRoot;
+        });
+    };
+
+    auto cache1 = makeCountingCache();
+    EXPECT_EQ(cache1->getRoot()->getAttr("a")->getAttr("b")->getString(), "leaf");
+    EXPECT_EQ(cache1->getRoot()->getAttr("a")->maybeGetAttr("nope"), nullptr);
+    EXPECT_THAT(cache1->getRoot()->getAttr("a")->getAttrs(), testing::SizeIs(2));
+    cache1->commit();
+
+    loaderRuns = 0;
+    auto cache2 = makeCountingCache();
+    EXPECT_EQ(cache2->getRoot()->getAttr("a")->getAttr("b")->getString(), "leaf");
+    EXPECT_EQ(loaderRuns, 0u) << "the cached leaf survives its parent being listed";
+
+    std::vector<std::string> names;
+    for (auto & name : cache2->getRoot()->getAttr("a")->getAttrs())
+        names.emplace_back(state.symbols[name]);
+    EXPECT_THAT(names, testing::ElementsAre("b", "c")) << "a probe for an absent attribute is not a member";
+    EXPECT_EQ(loaderRuns, 0u);
+}
+
 TEST_F(EvalCacheTest, forceDerivationRootsAndValidatesOnlyOnce)
 {
     bool oldReadOnly = settings.readOnlyMode;

@@ -55,7 +55,9 @@ struct AttrDb
     {
         SQLite db;
         SQLiteStmt insertAttribute;
+        SQLiteStmt insertAttributeIfAbsent;
         SQLiteStmt insertAttributeWithContext;
+        SQLiteStmt promoteToAttrs;
         SQLiteStmt queryAttribute;
         SQLiteStmt queryAttributes;
         std::unique_ptr<SQLiteTxn> txn;
@@ -84,13 +86,22 @@ struct AttrDb
         state->insertAttribute.create(
             state->db, "insert or replace into Attributes(parent, name, type, value) values (?, ?, ?, ?)");
 
+        state->insertAttributeIfAbsent.create(
+            state->db, "insert or ignore into Attributes(parent, name, type, value) values (?, ?, ?, ?)");
+
         state->insertAttributeWithContext.create(
             state->db, "insert or replace into Attributes(parent, name, type, value, context) values (?, ?, ?, ?, ?)");
+
+        state->promoteToAttrs.create(
+            state->db, "update Attributes set type = ?, value = null, context = null where rowid = ?");
 
         state->queryAttribute.create(
             state->db, "select rowid, type, value, context from Attributes where parent = ? and name = ?");
 
-        state->queryAttributes.create(state->db, "select name from Attributes where parent = ?");
+        /* A probe for an absent attribute leaves a Missing row behind, and the
+           row it hangs off outlives the probe now that a listing reuses it, so
+           the members of an attrset are its children minus those. */
+        state->queryAttributes.create(state->db, "select name from Attributes where parent = ? and type != ?");
 
         state->txn = std::make_unique<SQLiteTxn>(state->db);
     }
@@ -126,18 +137,35 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()
-                .apply(key.first)
-                .apply(symbols[key.second])
-                .apply(AttrType::FullAttrs)
-                .apply(0, false)
-                .exec();
+            /* A row's id is the parent link of everything cached beneath it, so
+               reuse it: `insert or replace` would allocate a new one and orphan
+               that whole subtree. Listing an attrset must not discard what the
+               cache already knows about its members - the db is keyed by the
+               flake's fingerprint, so a re-listed attrset holds the same
+               attributes it held before. */
+            AttrId rowId = 0;
+            {
+                auto queryAttribute(state->queryAttribute.use().apply(key.first).apply(symbols[key.second]));
+                if (queryAttribute.next())
+                    rowId = (AttrId) queryAttribute.getInt(0);
+            }
 
-            AttrId rowId = state->db.getLastInsertedRowId();
+            if (rowId)
+                state->promoteToAttrs.use().apply(AttrType::FullAttrs).apply(rowId).exec();
+            else {
+                state->insertAttribute.use()
+                    .apply(key.first)
+                    .apply(symbols[key.second])
+                    .apply(AttrType::FullAttrs)
+                    .apply(0, false)
+                    .exec();
+                rowId = state->db.getLastInsertedRowId();
+            }
+
             assert(rowId);
 
             for (auto & attr : attrs)
-                state->insertAttribute.use()
+                state->insertAttributeIfAbsent.use()
                     .apply(rowId)
                     .apply(symbols[attr])
                     .apply(AttrType::Placeholder)
@@ -311,7 +339,7 @@ struct AttrDb
         case AttrType::FullAttrs: {
             // FIXME: expensive, should separate this out.
             std::vector<Symbol> attrs;
-            auto queryAttributes(state->queryAttributes.use().apply(rowId));
+            auto queryAttributes(state->queryAttributes.use().apply(rowId).apply(AttrType::Missing));
             while (queryAttributes.next())
                 attrs.emplace_back(symbols.create(queryAttributes.getStr(0)));
             return {{rowId, attrs}};
