@@ -127,6 +127,15 @@ static BuildResult::Failure::Status failureStatusFromString(std::string_view str
     throw Error("unknown built result failure status '%s'", str);
 }
 
+using ResourceUsageField = std::optional<uint64_t> BuildResult::*;
+
+static constexpr std::array<std::pair<std::string_view, ResourceUsageField>, 4> resourceUsageFields{{
+    {"memoryPeak", &BuildResult::memoryPeak},
+    {"ioReadBytes", &BuildResult::ioReadBytes},
+    {"ioWriteBytes", &BuildResult::ioWriteBytes},
+    {"oomKills", &BuildResult::oomKills},
+}};
+
 bool BuildError::operator==(const BuildError & other) const noexcept
 {
     return status == other.status && isNonDeterministic == other.isNonDeterministic && message() == other.message();
@@ -162,6 +171,9 @@ void adl_serializer<BuildResult>::to_json(json & res, const BuildResult & br)
     if (br.cpuSystem.has_value()) {
         res["cpuSystem"] = br.cpuSystem->count();
     }
+    for (auto [name, field] : resourceUsageFields)
+        if (auto & value = br.*field)
+            res[std::string{name}] = *value;
 
     // Handle success or failure variant
     std::visit(
@@ -198,6 +210,9 @@ BuildResult adl_serializer<BuildResult>::from_json(const json & _json)
     if (auto cpuSystem = optionalValueAt(json, "cpuSystem")) {
         br.cpuSystem = std::chrono::microseconds(getUnsigned(*cpuSystem));
     }
+    for (auto [name, field] : resourceUsageFields)
+        if (auto value = optionalValueAt(json, name))
+            br.*field = getUnsigned(*value);
 
     // Determine success or failure based on success field
     bool success = getBoolean(valueAt(json, "success"));
