@@ -184,6 +184,7 @@ Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation 
         /* Report the exit status of *some* failing goal. This might not be strictly
            correct, since multiple subgoals can fail independently, but this should be
            a good enough heuristic without --keep-going. */
+        buildResult = g->buildResult;
         co_return doneFailure(exitCode, *failure);
     }
 
@@ -197,8 +198,6 @@ Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation 
 
     for (const auto & success : successes)
         std::ranges::copy(success.builtOutputs, std::inserter(outputs, outputs.end()));
-
-    auto statuses = successes | std::views::transform(&BuildResult::Success::status);
 
     /* Aggregate the status code. If some outputs we already valid, but we had
        to build/substitute the other ones, report it as the smallest common
@@ -224,8 +223,16 @@ Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation 
         return toPriority(a) < toPriority(b);
     };
 
+    /* Keep the statistics (build times, CPU usage) of the goal that did the
+       most work, `Worker::buildDerivation` reports them to daemon clients. */
+    const auto & mostWork = *std::ranges::min_element(concreteDrvGoals, compareSuccesses, [](const GoalPtr & goal) {
+        return goal->buildResult.tryGetSuccess()->status;
+    });
+
+    buildResult = mostWork->buildResult;
+
     co_return doneSuccess({
-        .status = std::ranges::min(statuses, compareSuccesses),
+        .status = mostWork->buildResult.tryGetSuccess()->status,
         .builtOutputs = std::move(outputs),
     });
 }
