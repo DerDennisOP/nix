@@ -6,6 +6,7 @@
 #include "nix/expr/fetch-tree.hh"
 #include "nix/store/store-api.hh"
 #include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/fetch-settings.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/fetchers/tarball.hh"
@@ -471,6 +472,22 @@ static RegisterPrimOp primop_fetchFinalTree({
     .internal = true,
 });
 
+static StorePath fetchThroughHook(
+    EvalState & state,
+    const std::string & who,
+    const std::string & url,
+    const std::string & name,
+    const std::optional<Hash> & expectedHash,
+    const std::optional<StorePath> & expectedPath)
+{
+    auto args = nlohmann::json{{"url", url}, {"name", name}};
+    if (expectedHash)
+        args["sha256"] = expectedHash->to_string(HashFormat::SRI, true);
+    return fetchers::callFetchHook(
+               state.fetchSettings, *state.store, nlohmann::json{{"builtin", who}, {"args", args}}, expectedPath)
+        .first;
+}
+
 static void fetch(
     EvalState & state,
     const PosIdx pos,
@@ -552,8 +569,9 @@ static void fetch(
             .debugThrow();
 
     // early exit if pinned and already in the store
+    std::optional<StorePath> expectedPath;
     if (expectedHash && expectedHash->algo == HashAlgorithm::SHA256) {
-        auto expectedPath = state.store->makeFixedOutputPath(
+        expectedPath = state.store->makeFixedOutputPath(
             name,
             FixedOutputInfo{
                 .method = unpack ? FileIngestionMethod::NixArchive : FileIngestionMethod::Flat,
@@ -562,17 +580,22 @@ static void fetch(
 
         // Try to get the path from the local store or substituters
         try {
-            state.store->ensurePath(expectedPath);
-            debug("using substituted/cached path '%s' for '%s'", state.store->printStorePath(expectedPath), *url);
-            state.allowAndSetStorePathString(expectedPath, v);
+            state.store->ensurePath(*expectedPath);
+            debug("using substituted/cached path '%s' for '%s'", state.store->printStorePath(*expectedPath), *url);
+            state.allowAndSetStorePathString(*expectedPath, v);
             return;
         } catch (Error & e) {
             debug(
                 "substitution of '%s' failed, will try to download: %s",
-                state.store->printStorePath(expectedPath),
+                state.store->printStorePath(*expectedPath),
                 e.what());
             // Fall through to download
         }
+    }
+
+    if (state.fetchSettings.fetchHook) {
+        state.allowAndSetStorePathString(fetchThroughHook(state, who, *url, name, expectedHash, expectedPath), v);
+        return;
     }
 
     if (unpack) {
