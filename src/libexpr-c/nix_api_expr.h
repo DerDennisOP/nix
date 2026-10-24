@@ -16,6 +16,7 @@
 #include "nix_api_store.h"
 #include "nix_api_util.h"
 #include <stddef.h>
+#include <stdint.h>
 
 #ifndef __has_c_attribute
 #  define __has_c_attribute(x) 0
@@ -291,6 +292,66 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath, 
  * @param[in] state The state to free.
  */
 void nix_state_free(EvalState * state);
+
+/**
+ * @brief Get the evaluation statistics of a state as a JSON string.
+ *
+ * The same data Nix writes when `NIX_SHOW_STATS` is set: CPU time, the
+ * number of thunks, function calls, allocations, GC and symbol table
+ * statistics.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] state The evaluator state to read statistics from
+ * @param[in] callback Called with the JSON string
+ * @param[in] user_data Optional, passed to the callback
+ * @return NIX_OK if there were no errors.
+ */
+nix_err nix_eval_state_get_stats_json(
+    nix_c_context * context, EvalState * state, nix_get_string_callback callback, void * user_data);
+
+/**
+ * @brief Turn on the evaluation counters.
+ *
+ * The counters stay at zero unless this is called before evaluation starts,
+ * or the environment variable `NIX_SHOW_STATS` is set, since counting costs
+ * in multi-threaded evaluation. Applies to every evaluator state.
+ *
+ * @param[out] context Optional, stores error information
+ * @return NIX_OK if there were no errors.
+ */
+nix_err nix_eval_stats_enable(nix_c_context * context);
+
+/**
+ * @brief The cumulative evaluation counters of a state.
+ *
+ * The counters only grow over the lifetime of a state, so the cost of one
+ * evaluation is the difference of two readings. They stay at zero without
+ * nix_eval_stats_enable(). The GC fields are zero when Nix was built
+ * without Boehm GC.
+ */
+typedef struct nix_eval_stats
+{
+    uint64_t nr_thunks;
+    uint64_t nr_function_calls;
+    uint64_t nr_primop_calls;
+    uint64_t nr_lookups;
+    uint64_t nr_op_updates;
+    uint64_t gc_heap_size;
+    uint64_t gc_total_bytes;
+} nix_eval_stats;
+
+/**
+ * @brief Read the evaluation counters of a state.
+ *
+ * Cheap enough to call before and after every evaluation, unlike
+ * nix_eval_state_get_stats_json() which serializes all statistics.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] state The evaluator state to read the counters from
+ * @param[out] out Filled with the current counters
+ * @return NIX_OK if there were no errors.
+ */
+nix_err nix_eval_state_get_stats(nix_c_context * context, EvalState * state, nix_eval_stats * out);
 
 /** @addtogroup GC
  * @ingroup libexpr
