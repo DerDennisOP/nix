@@ -24,6 +24,8 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
 
+#include <nlohmann/json_fwd.hpp>
+
 #include <map>
 #include <optional>
 #include <functional>
@@ -1042,6 +1044,26 @@ public:
      * GC statistics are more accurate.
      */
     void maybePrintStats();
+
+    /**
+     * The statistics that `printStatistics()` writes, without the I/O.
+     * Cheap; does not run a GC first.
+     */
+    nlohmann::json getStatisticsJSON();
+
+    /**
+     * The cumulative evaluation counters and the heap size, cheap enough
+     * to read before and after every evaluation. The counters only count
+     * while `Counter::enabled` is set; the GC fields are zero without
+     * Boehm GC.
+     */
+    struct Stats
+    {
+        uint64_t nrThunks, nrFunctionCalls, nrPrimOpCalls, nrLookups, nrOpUpdates;
+        uint64_t gcHeapSize, gcTotalBytes;
+    };
+
+    Stats getStats();
 
     /**
      * Print statistics, unconditionally, cheaply, without performing a GC first.
