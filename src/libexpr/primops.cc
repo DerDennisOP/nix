@@ -22,6 +22,7 @@
 
 #include <boost/container/small_vector.hpp>
 #include <boost/unordered/concurrent_flat_map.hpp>
+#include <boost/unordered/concurrent_flat_set.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <nlohmann/json.hpp>
 
@@ -1859,6 +1860,11 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
     auto drvPath =
         settings.readOnlyMode ? computeStorePath(*state.store, drv) : state.store->writeDerivation(drv, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
+
+    /* writeDerivation just rooted and registered the path, so validity
+       checks against it (e.g. AttrCursor::forceDerivation) can be elided. */
+    if (!settings.readOnlyMode)
+        state.rootedValidPaths->insert(drvPath);
 
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 

@@ -8,6 +8,8 @@
 // Need specialization involving `SymbolStr` just in this one module.
 #include "nix/util/strings-inline.hh"
 
+#include <boost/unordered/concurrent_flat_set.hpp>
+
 namespace nix::eval_cache {
 
 void CachedEvalError::anchor() {}
@@ -635,6 +637,7 @@ string_t AttrCursor::getStringWithContext()
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
                 bool valid = true;
+                StorePathSet toCheck;
                 for (auto & c : s->second) {
                     const StorePath & path = std::visit(
                         overloaded{
@@ -645,11 +648,16 @@ string_t AttrCursor::getStringWithContext()
                             [&](const NixStringContextElem::Opaque & o) -> const StorePath & { return o.path; },
                         },
                         c.raw);
-                    root->state.store->addTempRoot(path);
-                    if (!root->state.store->isValidPath(path)) {
-                        valid = false;
-                        break;
-                    }
+                    if (!root->state.rootedValidPaths->contains(path))
+                        toCheck.insert(path);
+                }
+                if (!toCheck.empty()) {
+                    for (auto & path : toCheck)
+                        root->state.store->addTempRoot(path);
+                    auto validPaths = root->state.store->queryValidPaths(toCheck);
+                    for (auto & path : validPaths)
+                        root->state.rootedValidPaths->insert(path);
+                    valid = validPaths.size() == toCheck.size();
                 }
                 if (valid) {
                     debug("using cached string attribute '%s'", getAttrPathStr());
@@ -790,7 +798,7 @@ StorePath AttrCursor::forceDerivation()
     auto aDrvPath = getAttr(root->state.s.drvPath);
     auto drvPath = root->state.store->parseStorePath(aDrvPath->getString());
     drvPath.requireDerivation();
-    if (!settings.readOnlyMode) {
+    if (!settings.readOnlyMode && !root->state.rootedValidPaths->contains(drvPath)) {
         root->state.store->addTempRoot(drvPath);
         if (!root->state.store->isValidPath(drvPath)) {
             /* The eval cache contains 'drvPath', but the actual path has
@@ -800,6 +808,7 @@ StorePath AttrCursor::forceDerivation()
                 throw Error(
                     "don't know how to recreate store derivation '%s'!", root->state.store->printStorePath(drvPath));
         }
+        root->state.rootedValidPaths->insert(drvPath);
     }
     return drvPath;
 }
