@@ -10,6 +10,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <nlohmann/json.hpp>
+
 #include "expr-tests-config.hh"
 
 namespace nixC {
@@ -673,6 +675,51 @@ TEST_F(nix_api_expr_test, nix_expr_thunk_re_evaluation_after_deployment)
     nix_get_string(ctx, thunk, OBSERVE_STRING(result));
     assert_ctx_ok();
     ASSERT_STREQ("vm-12345", result.c_str());
+}
+
+TEST_F(nix_api_expr_test, nix_eval_state_get_stats_json)
+{
+    auto value = nix_alloc_value(ctx, state);
+    nix_expr_eval_from_string(ctx, state, "let f = x: x + x; in f 21", ".", value);
+    assert_ctx_ok();
+    nix_value_force(ctx, state, value);
+    assert_ctx_ok();
+
+    std::string statsJson;
+    auto r = nix_eval_state_get_stats_json(ctx, state, OBSERVE_STRING(statsJson));
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, r);
+
+    auto j = nlohmann::json::parse(statsJson);
+    ASSERT_TRUE(j.contains("cpuTime"));
+    ASSERT_TRUE(j.contains("nrThunks"));
+    ASSERT_TRUE(j.contains("envs"));
+    ASSERT_TRUE(j["envs"].contains("bytes"));
+}
+
+TEST_F(nix_api_expr_test, nix_eval_state_get_stats)
+{
+    ASSERT_EQ(NIX_OK, nix_eval_stats_enable(ctx));
+    assert_ctx_ok();
+
+    nix_eval_stats before{};
+    ASSERT_EQ(NIX_OK, nix_eval_state_get_stats(ctx, state, &before));
+    assert_ctx_ok();
+
+    auto value = nix_alloc_value(ctx, state);
+    nix_expr_eval_from_string(ctx, state, "let f = x: x + x; in f 21", ".", value);
+    assert_ctx_ok();
+    nix_value_force(ctx, state, value);
+    assert_ctx_ok();
+
+    nix_eval_stats after{};
+    ASSERT_EQ(NIX_OK, nix_eval_state_get_stats(ctx, state, &after));
+    assert_ctx_ok();
+
+    ASSERT_GT(after.nr_function_calls, before.nr_function_calls);
+    ASSERT_GE(after.nr_thunks, before.nr_thunks);
+    ASSERT_GE(after.nr_primop_calls, before.nr_primop_calls);
+    ASSERT_GE(after.nr_lookups, before.nr_lookups);
 }
 
 } // namespace nixC

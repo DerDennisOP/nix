@@ -2,6 +2,9 @@
 #include <stdexcept>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
+#include "nix/expr/counter.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-gc.hh"
 #include "nix/store/globals.hh"
@@ -99,6 +102,44 @@ nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_val
         context->last_err_code = NIX_OK;
     try {
         state->state.forceValueDeep(*value->value);
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_eval_stats_enable(nix_c_context * context)
+{
+    nix_clear_err(context);
+    try {
+        nix::Counter::enabled = true;
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_eval_state_get_stats_json(
+    nix_c_context * context, EvalState * state, nix_get_string_callback callback, void * user_data)
+{
+    nix_clear_err(context);
+    try {
+        return call_nix_get_string_callback(state->state.getStatisticsJSON().dump(), callback, user_data);
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_eval_state_get_stats(nix_c_context * context, EvalState * state, nix_eval_stats * out)
+{
+    nix_clear_err(context);
+    try {
+        auto s = state->state.getStats();
+        *out = nix_eval_stats{
+            .nr_thunks = s.nrThunks,
+            .nr_function_calls = s.nrFunctionCalls,
+            .nr_primop_calls = s.nrPrimOpCalls,
+            .nr_lookups = s.nrLookups,
+            .nr_op_updates = s.nrOpUpdates,
+            .gc_heap_size = s.gcHeapSize,
+            .gc_total_bytes = s.gcTotalBytes,
+        };
+        return NIX_OK;
     }
     NIXC_CATCH_ERRS
 }
