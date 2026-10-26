@@ -216,6 +216,23 @@ nix_err nix_store_add_perm_root(
     void * user_data);
 
 /**
+ * @brief Get the system features of the machine a Nix store builds on.
+ *
+ * These are the features the store checks a derivation's `requiredSystemFeatures` against. Unless the store sets the
+ * `system-features` store setting, they are the `system-features` setting plus the features implied by enabled
+ * experimental features, such as `recursive-nix`.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store reference
+ * @param[in] callback Called once for each system feature, in sorted order.
+ * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
+ * @see nix_get_string_callback
+ * @return error code, NIX_OK on success.
+ */
+nix_err nix_store_get_system_features(
+    nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
+
+/**
  * @brief Create a `nix_derivation` from a JSON representation of that derivation.
  *
  * @note Unlike `nix_derivation_to_json`, this needs a `Store`. This is because

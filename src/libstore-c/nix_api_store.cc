@@ -131,6 +131,19 @@ nix_err nix_store_add_perm_root(
     NIXC_CATCH_ERRS
 }
 
+nix_err nix_store_get_system_features(
+    nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        for (auto & feature : store->ptr->config.systemFeatures.get())
+            call_nix_get_string_callback(feature, callback, user_data);
+        return NIX_OK;
+    }
+    NIXC_CATCH_ERRS
+}
+
 bool nix_store_is_valid_path(nix_c_context * context, Store * store, const StorePath * path)
 {
     if (context)
