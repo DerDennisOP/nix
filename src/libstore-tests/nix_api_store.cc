@@ -182,6 +182,29 @@ TEST_F(nix_api_util_context, nix_store_open_dummy)
     nix_store_free(store);
 }
 
+TEST_F(nix_api_util_context, nix_store_get_system_features)
+{
+    nix_libstore_init(ctx);
+    const char * p1[] = {"system-features", "kvm big-parallel"};
+    const char ** params[] = {p1, nullptr};
+    Store * store = nix_store_open(ctx, "dummy://", params);
+    assert_ctx_ok();
+
+    std::vector<std::string> features;
+    auto ret = nix_store_get_system_features(
+        ctx,
+        store,
+        [](const char * start, unsigned int n, void * user_data) {
+            static_cast<std::vector<std::string> *>(user_data)->emplace_back(start, n);
+        },
+        &features);
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, ret);
+    ASSERT_EQ((std::vector<std::string>{"big-parallel", "kvm"}), features);
+
+    nix_store_free(store);
+}
+
 TEST_F(nix_api_util_context, nix_store_open_invalid)
 {
     nix_libstore_init(ctx);
