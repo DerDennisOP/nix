@@ -1019,6 +1019,8 @@ std::optional<Fingerprint> LockedFlake::getFingerprint(Store & store, const fetc
     }
     if (auto lastModified = flake.lockedRef.input.getLastModified())
         *fingerprint += fmt(";lastModified=%d", *lastModified);
+    if (auto rev = flake.lockedRef.input.getRev())
+        *fingerprint += fmt(";rev=%s", rev->gitRev());
 
     // FIXME: as an optimization, if the flake contains a lock file
     // and we haven't changed it, then it's sufficient to use
